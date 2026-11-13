@@ -1,13 +1,13 @@
 # VoltWatch Simulator
 
-VoltWatch Simulator is an end-to-end battery telemetry simulation platform that emulates a 16-cell lithium-ion Battery Management System (BMS), streams telemetry over MQTT and REST, persists telemetry in SQLite, and visualizes data in a React dashboard.
+VoltWatch Simulator is an end-to-end battery telemetry simulation platform that emulates a 16-cell lithium-ion Battery Management System (BMS), streams telemetry over MQTT and REST, persists telemetry in PostgreSQL, and visualizes data in a React dashboard.
 
 ## Architecture
 
 Battery Telemetry Simulator (Python)
 -> MQTT + REST
 -> Flask Backend API
--> SQLite Database
+-> PostgreSQL (SQLite for lightweight local testing)
 -> React Dashboard
 
 ## Project Structure
@@ -45,7 +45,8 @@ voltwatch-simulator/
 - Simulates a fleet of 10+ batteries (16-cell Li-ion each) every 5 seconds
 - Publishes telemetry to MQTT topic `voltwatch/battery/telemetry`
 - Sends telemetry to Flask API endpoint `/api/telemetry`
-- Stores telemetry in SQLite database
+- Stores telemetry in PostgreSQL or SQLite
+- Calculates fleet and per-battery analytics with Pandas
 - Provides API endpoints for latest, history, and battery status
 - Displays real-time charts and latest records on React dashboard
 - Implements health state rules: `GOOD`, `WARNING`, `CRITICAL`
@@ -84,6 +85,8 @@ voltwatch-simulator/
 - `POST /api/telemetry` -> ingest telemetry payload
 - `GET /api/telemetry/latest` -> fetch latest telemetry
 - `GET /api/telemetry/history?limit=50` -> fetch historical telemetry
+- `GET /api/analytics/summary?limit=1000` -> summarize telemetry by battery
+- `GET /api/analytics/summary?device_id=battery_pack_01&limit=1000` -> summarize one battery
 - `GET /api/powerbi/telemetry?limit=1000` -> fetch flat, Power BI-ready telemetry rows
 - `GET /api/powerbi/telemetry?device_id=battery_pack_01&start=2026-04-01T00:00:00+00:00&end=2026-05-01T00:00:00+00:00` -> time-range extraction for one battery
 - `GET /api/battery/status` -> fetch health + latest telemetry
@@ -96,6 +99,10 @@ The dashboard includes month pickers and export buttons for:
 
 - All batteries (from Battery List page)
 - Selected battery (from Battery Details page)
+
+The battery details view also shows average voltage, current, state of charge,
+and temperature, plus alarm counts calculated from the latest 1,000 telemetry
+records for the selected battery.
 
 You can also export directly from API:
 
@@ -131,14 +138,20 @@ Refresh note:
 
 ### macOS
 
-Install Python 3 and Node.js (including npm) if they are not already installed.
-Run these commands from the project root.
+Install Python 3, Node.js (including npm), and Docker Desktop if they are not
+already installed. Start the local PostgreSQL database from the project root:
+
+```bash
+docker compose up -d db
+```
+
+In the first Terminal window, set up and start the backend:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python -m backend.app
+DATABASE_URL=postgresql+psycopg://voltwatch:voltwatch@localhost:5433/voltwatch python -m backend.app
 ```
 
 The backend starts at `http://localhost:5000`. Keep this terminal open.
@@ -172,7 +185,7 @@ Keep the backend and frontend terminals open while using the app.
 If port 5000 is already in use on your Mac, start the backend on port 5001:
 
 ```bash
-API_PORT=5001 python -m backend.app
+DATABASE_URL=postgresql+psycopg://voltwatch:voltwatch@localhost:5433/voltwatch API_PORT=5001 python -m backend.app
 ```
 
 In the frontend terminal, set its API URL to match:
@@ -184,12 +197,30 @@ REACT_APP_API_BASE=http://localhost:5001 npm start
 ## Continuous Integration
 
 GitHub Actions runs on pushes, pull requests, and manual dispatch. It compiles the
-Python backend and simulator, runs the backend smoke test, installs frontend
-dependencies with `npm ci`, and builds the React dashboard.
+Python backend and simulator, runs the Pytest suite against SQLite and PostgreSQL,
+installs frontend dependencies with `npm ci`, and builds the React dashboard.
+
+Run the unit tests locally with:
+
+```bash
+source .venv/bin/activate
+python -m pytest -q
+```
+
+To run the PostgreSQL integration test against the local Compose database:
+
+```bash
+POSTGRES_TEST_URL=postgresql+psycopg://voltwatch:voltwatch@localhost:5433/voltwatch \
+  python -m pytest -q tests/test_database.py::test_postgresql_round_trip
+```
 
 ## Notes
 
-- SQLite database file defaults to `voltwatch.db` in project root.
+- PostgreSQL is the default runtime database. Set `DATABASE_URL` to a SQLAlchemy
+  PostgreSQL URL to use another instance. The included `compose.yaml` starts a
+  local PostgreSQL instance for development.
+- SQLite remains supported for isolated tests and lightweight development by
+  setting `DATABASE_URL=sqlite:///voltwatch.db` (or the legacy `DATABASE_PATH`).
 - MQTT broker defaults to `broker.hivemq.com:1883`.
 - MQTT topic defaults to `voltwatch/battery/telemetry`.
 - CORS is enabled for local frontend development.

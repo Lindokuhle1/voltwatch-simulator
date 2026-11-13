@@ -11,7 +11,7 @@ def create_app() -> Flask:
 	app.config.from_object(Config)
 	CORS(app)
 
-	db = Database(app.config["DATABASE_PATH"])
+	db = Database(app.config["DATABASE_URL"])
 	app.register_blueprint(build_blueprint(db))
 
 	@app.get("/health")

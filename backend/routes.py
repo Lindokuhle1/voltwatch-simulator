@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, Response, jsonify, request
 
+from .analytics import summarize_telemetry
 from .models import TelemetryPayload, compute_health
 
 
@@ -139,6 +140,21 @@ def build_blueprint(db):
             )
 
         return jsonify({"count": len(items), "items": items})
+
+    @api.get("/analytics/summary")
+    def analytics_summary():
+        limit = request.args.get("limit", default=1000, type=int)
+        limit = max(1, min(limit, 10000))
+        device_id = request.args.get("device_id", type=str)
+        records = db.fetch_history(limit=limit, device_id=device_id)
+        items = summarize_telemetry(records)
+        return jsonify(
+            {
+                "count": len(items),
+                "sample_count": sum(item["samples"] for item in items),
+                "items": items,
+            }
+        )
 
     @api.get("/reports/monthly")
     def monthly_report():

@@ -11,6 +11,20 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: voltwatch
+          POSTGRES_USER: voltwatch
+          POSTGRES_PASSWORD: voltwatch
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U voltwatch -d voltwatch"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -29,7 +43,9 @@ jobs:
         run: python -m compileall -q backend scripts tests
 
       - name: Test backend
-        run: python -m unittest discover --start-directory tests --verbose
+        env:
+          POSTGRES_TEST_URL: postgresql+psycopg://voltwatch:voltwatch@localhost:5432/voltwatch
+        run: python -m pytest -q
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

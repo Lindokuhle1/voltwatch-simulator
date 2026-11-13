@@ -23,3 +23,15 @@ node_modules/
 .env.*
 !.env.example
 *.log
+
+# IDEs and editors
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+#docs
+docs/_build/
+*.csv
+*.xlsx

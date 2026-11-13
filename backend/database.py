@@ -1,158 +1,148 @@
 import json
-import sqlite3
 import threading
-from pathlib import Path
 from typing import Any
 
+from sqlalchemy import (
+    Column,
+    Float,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    Text,
+    create_engine,
+    func,
+    inspect,
+    select,
+    text,
+)
+from sqlalchemy.engine import Engine, URL
+from sqlalchemy.pool import StaticPool
 
-SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS telemetry (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    device_id TEXT NOT NULL,
-    timestamp TEXT NOT NULL,
-    pack_voltage REAL NOT NULL,
-    pack_current REAL NOT NULL,
-    soc REAL NOT NULL,
-    temperature REAL NOT NULL,
-    cycle_count INTEGER NOT NULL,
-    latitude REAL,
-    longitude REAL,
-    cell_voltages TEXT NOT NULL,
-    alarms TEXT NOT NULL
-);
-"""
+
+metadata = MetaData()
+telemetry = Table(
+    "telemetry",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("device_id", String, nullable=False, index=True),
+    Column("timestamp", String, nullable=False, index=True),
+    Column("pack_voltage", Float, nullable=False),
+    Column("pack_current", Float, nullable=False),
+    Column("soc", Float, nullable=False),
+    Column("temperature", Float, nullable=False),
+    Column("cycle_count", Integer, nullable=False),
+    Column("latitude", Float),
+    Column("longitude", Float),
+    Column("cell_voltages", Text, nullable=False),
+    Column("alarms", Text, nullable=False),
+)
 
 
 class Database:
-    def __init__(self, db_path: str) -> None:
-        self.db_path = Path(db_path)
+    def __init__(self, database_url: str) -> None:
         self._lock = threading.Lock()
-        self._connection = sqlite3.connect(self.db_path, check_same_thread=False)
-        self._connection.row_factory = sqlite3.Row
+        if "://" not in database_url and database_url != ":memory:":
+            database_url = URL.create("sqlite", database=database_url).render_as_string(
+                hide_password=False
+            )
+        elif database_url == ":memory:":
+            database_url = "sqlite:///:memory:"
+
+        engine_options: dict[str, Any] = {"future": True}
+        if database_url.startswith("sqlite:"):
+            engine_options["connect_args"] = {"check_same_thread": False}
+            if database_url.endswith(":memory:"):
+                engine_options["poolclass"] = StaticPool
+
+        self.engine: Engine = create_engine(database_url, **engine_options)
         self.init_db()
 
     def init_db(self) -> None:
-        with self._lock:
-            self._connection.executescript(SCHEMA_SQL)
-            self._ensure_columns()
-            self._connection.commit()
+        metadata.create_all(self.engine)
+        existing = {column["name"] for column in inspect(self.engine).get_columns("telemetry")}
+        with self.engine.begin() as connection:
+            for name in ("latitude", "longitude"):
+                if name not in existing:
+                    connection.execute(text(f"ALTER TABLE telemetry ADD COLUMN {name} FLOAT"))
 
     def close(self) -> None:
-        with self._lock:
-            self._connection.close()
+        self.engine.dispose()
 
-    def _ensure_columns(self) -> None:
-        existing = {
-            row["name"]
-            for row in self._connection.execute("PRAGMA table_info(telemetry)").fetchall()
-        }
-        if "latitude" not in existing:
-            self._connection.execute("ALTER TABLE telemetry ADD COLUMN latitude REAL")
-        if "longitude" not in existing:
-            self._connection.execute("ALTER TABLE telemetry ADD COLUMN longitude REAL")
+    @staticmethod
+    def _row_to_dict(row: Any) -> dict[str, Any]:
+        record = dict(row)
+        record["cell_voltages"] = json.loads(record["cell_voltages"])
+        record["alarms"] = json.loads(record["alarms"])
+        return record
 
     def insert_telemetry(self, payload: dict[str, Any]) -> int:
-        query = """
-            INSERT INTO telemetry (
-                device_id, timestamp, pack_voltage, pack_current, soc,
-                temperature, cycle_count, latitude, longitude, cell_voltages, alarms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """
-        values = (
-            payload["device_id"],
-            payload["timestamp"],
-            payload["pack_voltage"],
-            payload["pack_current"],
-            payload["soc"],
-            payload["temperature"],
-            payload["cycle_count"],
-            payload.get("latitude"),
-            payload.get("longitude"),
-            json.dumps(payload["cell_voltages"]),
-            json.dumps(payload["alarms"]),
-        )
-        with self._lock:
-            cursor = self._connection.execute(query, values)
-            self._connection.commit()
-            return int(cursor.lastrowid)
+        values = {
+            "device_id": payload["device_id"],
+            "timestamp": payload["timestamp"],
+            "pack_voltage": payload["pack_voltage"],
+            "pack_current": payload["pack_current"],
+            "soc": payload["soc"],
+            "temperature": payload["temperature"],
+            "cycle_count": payload["cycle_count"],
+            "latitude": payload.get("latitude"),
+            "longitude": payload.get("longitude"),
+            "cell_voltages": json.dumps(payload["cell_voltages"]),
+            "alarms": json.dumps(payload["alarms"]),
+        }
+        with self._lock, self.engine.begin() as connection:
+            result = connection.execute(telemetry.insert().values(**values))
+            return int(result.inserted_primary_key[0])
 
     def fetch_latest(self, device_id: str | None = None) -> dict[str, Any] | None:
+        query = select(telemetry).order_by(telemetry.c.id.desc()).limit(1)
         if device_id:
-            query = "SELECT * FROM telemetry WHERE device_id = ? ORDER BY id DESC LIMIT 1"
-            params = (device_id,)
-        else:
-            query = "SELECT * FROM telemetry ORDER BY id DESC LIMIT 1"
-            params = ()
+            query = query.where(telemetry.c.device_id == device_id)
 
-        with self._lock:
-            row = self._connection.execute(query, params).fetchone()
+        with self._lock, self.engine.connect() as connection:
+            row = connection.execute(query).mappings().first()
         return self._row_to_dict(row) if row else None
 
     def fetch_history(
         self, limit: int = 100, device_id: str | None = None
     ) -> list[dict[str, Any]]:
+        query = select(telemetry).order_by(telemetry.c.id.desc()).limit(limit)
         if device_id:
-            query = "SELECT * FROM telemetry WHERE device_id = ? ORDER BY id DESC LIMIT ?"
-            params = (device_id, limit)
-        else:
-            query = "SELECT * FROM telemetry ORDER BY id DESC LIMIT ?"
-            params = (limit,)
+            query = query.where(telemetry.c.device_id == device_id)
 
-        with self._lock:
-            rows = self._connection.execute(query, params).fetchall()
+        with self._lock, self.engine.connect() as connection:
+            rows = connection.execute(query).mappings().all()
         return [self._row_to_dict(row) for row in rows]
 
     def fetch_latest_by_device(self, limit: int = 100) -> list[dict[str, Any]]:
-        query = """
-            SELECT t.*
-            FROM telemetry t
-            INNER JOIN (
-                SELECT device_id, MAX(id) AS max_id
-                FROM telemetry
-                GROUP BY device_id
-            ) latest ON t.id = latest.max_id
-            ORDER BY t.device_id ASC
-            LIMIT ?
-        """
-        with self._lock:
-            rows = self._connection.execute(query, (limit,)).fetchall()
+        latest_ids = (
+            select(telemetry.c.device_id, func.max(telemetry.c.id).label("latest_id"))
+            .group_by(telemetry.c.device_id)
+            .subquery()
+        )
+        query = (
+            select(telemetry)
+            .join(latest_ids, telemetry.c.id == latest_ids.c.latest_id)
+            .order_by(telemetry.c.device_id.asc())
+            .limit(limit)
+        )
+        with self._lock, self.engine.connect() as connection:
+            rows = connection.execute(query).mappings().all()
         return [self._row_to_dict(row) for row in rows]
 
     def fetch_by_time_range(
         self, start_ts: str, end_ts: str, device_id: str | None = None
     ) -> list[dict[str, Any]]:
+        query = (
+            select(telemetry)
+            .where(telemetry.c.timestamp >= start_ts, telemetry.c.timestamp < end_ts)
+            .order_by(telemetry.c.timestamp.asc())
+        )
         if device_id:
-            query = """
-                SELECT * FROM telemetry
-                WHERE timestamp >= ? AND timestamp < ? AND device_id = ?
-                ORDER BY timestamp ASC
-            """
-            params = (start_ts, end_ts, device_id)
+            query = query.where(telemetry.c.device_id == device_id)
         else:
-            query = """
-                SELECT * FROM telemetry
-                WHERE timestamp >= ? AND timestamp < ?
-                ORDER BY device_id ASC, timestamp ASC
-            """
-            params = (start_ts, end_ts)
+            query = query.order_by(telemetry.c.device_id.asc(), telemetry.c.timestamp.asc())
 
-        with self._lock:
-            rows = self._connection.execute(query, params).fetchall()
+        with self._lock, self.engine.connect() as connection:
+            rows = connection.execute(query).mappings().all()
         return [self._row_to_dict(row) for row in rows]
-
-    @staticmethod
-    def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
-        return {
-            "id": row["id"],
-            "device_id": row["device_id"],
-            "timestamp": row["timestamp"],
-            "pack_voltage": row["pack_voltage"],
-            "pack_current": row["pack_current"],
-            "soc": row["soc"],
-            "temperature": row["temperature"],
-            "cycle_count": row["cycle_count"],
-            "latitude": row["latitude"],
-            "longitude": row["longitude"],
-            "cell_voltages": json.loads(row["cell_voltages"]),
-            "alarms": json.loads(row["alarms"]),
-        }

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   downloadMonthlyReport,
+  getBatteryAnalytics,
   getBatteryDailySummary,
   getBatteries,
   getBatteryStatus,
@@ -21,6 +22,7 @@ function Dashboard() {
     charging_hours: 0,
     samples: 0,
   });
+  const [analytics, setAnalytics] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
@@ -47,15 +49,17 @@ function Dashboard() {
     if (!selectedDeviceId) {
       setStatus({ health: "UNKNOWN", latest: null });
       setHistory([]);
+      setAnalytics(null);
       return;
     }
 
     let mounted = true;
 
     const loadSelectedBatteryData = async () => {
-      const [statusData, historyData] = await Promise.all([
+      const [statusData, historyData, analyticsData] = await Promise.all([
         getBatteryStatus(selectedDeviceId),
         getTelemetryHistory(25, selectedDeviceId),
+        getBatteryAnalytics(selectedDeviceId),
       ]);
       const summaryData = await getBatteryDailySummary(selectedDeviceId, dailyDate);
 
@@ -64,6 +68,7 @@ function Dashboard() {
       }
       setStatus(statusData);
       setHistory((historyData.items || []).slice().reverse());
+      setAnalytics(analyticsData);
       setDailySummary(summaryData);
     };
 
@@ -153,8 +158,8 @@ function Dashboard() {
           <table>
             <thead>
               <tr>
-                <th>Entity Name</th>
-                <th>packSoC</th>
+                <th>Battery Serial</th>
+                <th>State Of Charge</th>
                 <th>Error_Count</th>
                 <th>active</th>
                 <th>cellIRmax</th>
@@ -224,7 +229,7 @@ function Dashboard() {
               <>
                 <div className="detail-grid">
                   <div className="detail-item">
-                    <span>Entity name</span>
+                    <span>Battery Serial</span>
                     <strong>{selectedBattery.device_id}</strong>
                   </div>
                   <div className="detail-item">
@@ -232,7 +237,7 @@ function Dashboard() {
                     <strong>{selectedBattery.health}</strong>
                   </div>
                   <div className="detail-item">
-                    <span>packSoC</span>
+                    <span>State Of Charge</span>
                     <strong>{selectedBattery.soc.toFixed(1)}%</strong>
                   </div>
                   <div className="detail-item">
@@ -244,15 +249,15 @@ function Dashboard() {
                     <strong>{selectedBattery.active ? "true" : "false"}</strong>
                   </div>
                   <div className="detail-item">
-                    <span>lastActivityTime</span>
+                    <span>last Activity Time</span>
                     <strong>{new Date(selectedBattery.last_activity).toLocaleString()}</strong>
                   </div>
                   <div className="detail-item">
-                    <span>packVoltage</span>
+                    <span>Pack Voltage</span>
                     <strong>{selectedBattery.pack_voltage.toFixed(2)} V</strong>
                   </div>
                   <div className="detail-item">
-                    <span>packCurrent</span>
+                    <span>Pack Current</span>
                     <strong>{selectedBattery.pack_current.toFixed(2)} A</strong>
                   </div>
                   <div className="detail-item">
@@ -355,6 +360,41 @@ function Dashboard() {
             <article className="card">
               <h2>Charging Hours</h2>
               <div className="metric">{Number(dailySummary.charging_hours || 0).toFixed(2)} h</div>
+            </article>
+          </section>
+
+          <section className="cards" aria-label="Battery analytics">
+            <article className="card">
+              <h2>Average Voltage</h2>
+              <div className="metric">
+                {analytics ? `${analytics.avg_pack_voltage.toFixed(2)} V` : "--"}
+              </div>
+            </article>
+            <article className="card">
+              <h2>Average Current</h2>
+              <div className="metric">
+                {analytics ? `${analytics.avg_pack_current.toFixed(2)} A` : "--"}
+              </div>
+            </article>
+            <article className="card">
+              <h2>Average SOC</h2>
+              <div className="metric">
+                {analytics ? `${analytics.avg_soc.toFixed(1)}%` : "--"}
+              </div>
+            </article>
+            <article className="card">
+              <h2>Average Temperature</h2>
+              <div className="metric">
+                {analytics ? `${analytics.avg_temperature.toFixed(1)} C` : "--"}
+              </div>
+            </article>
+            <article className="card">
+              <h2>Alarm Events</h2>
+              <div className="metric">{analytics ? analytics.alarm_events : "--"}</div>
+            </article>
+            <article className="card">
+              <h2>Analytics Samples</h2>
+              <div className="metric">{analytics ? analytics.samples : "--"}</div>
             </article>
           </section>
 

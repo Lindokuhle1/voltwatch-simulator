@@ -60,6 +60,16 @@ export async function getBatteryDailySummary(deviceId, date) {
   return response.json();
 }
 
+export async function getBatteryAnalytics(deviceId, limit = 1000) {
+  const params = new URLSearchParams({ limit: String(limit), device_id: deviceId });
+  const response = await fetch(`${API_BASE}/api/analytics/summary?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch battery analytics");
+  }
+  const data = await response.json();
+  return data.items[0] || null;
+}
+
 export async function downloadMonthlyReport(month, deviceId = "") {
   const params = new URLSearchParams();
   if (month) {
