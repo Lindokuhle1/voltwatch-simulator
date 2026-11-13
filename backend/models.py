@@ -86,7 +86,7 @@ def compute_health(telemetry: dict[str, Any] | None) -> str:
     temperature = float(telemetry["temperature"])
     pack_voltage = float(telemetry["pack_voltage"])
     cell_voltages = telemetry["cell_voltages"]
-    imbalance = max(cell_voltages) - min(cell_voltages)
+    imbalance = round(max(cell_voltages) - min(cell_voltages), 3)
 
     if pack_voltage > 58 or pack_voltage < 44:
         return "CRITICAL"

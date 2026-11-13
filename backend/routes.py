@@ -116,7 +116,7 @@ def build_blueprint(db):
             cell_voltages = row["cell_voltages"]
             cell_max = max(cell_voltages)
             cell_min = min(cell_voltages)
-            imbalance = cell_max - cell_min
+            imbalance = round(cell_max - cell_min, 3)
             items.append(
                 {
                     "id": row["id"],
@@ -199,7 +199,9 @@ def build_blueprint(db):
             stats["sum_temp"] += float(row["temperature"])
             stats["min_soc"] = min(stats["min_soc"], float(row["soc"]))
             stats["max_temp"] = max(stats["max_temp"], float(row["temperature"]))
-            imbalance = max(row["cell_voltages"]) - min(row["cell_voltages"])
+            imbalance = round(
+                max(row["cell_voltages"]) - min(row["cell_voltages"]), 3
+            )
             stats["max_imbalance"] = max(stats["max_imbalance"], imbalance)
             stats["alarm_events"] += len(row["alarms"])
             stats["last_cycle_count"] = max(stats["last_cycle_count"], int(row["cycle_count"]))

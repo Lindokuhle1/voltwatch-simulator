@@ -73,6 +73,7 @@ def test_compute_health_applies_health_thresholds():
     assert compute_health(None) == "UNKNOWN"
     assert compute_health(good) == "GOOD"
     assert compute_health({**good, "temperature": 40.1}) == "WARNING"
+    assert compute_health({**good, "cell_voltages": [3.4] + [3.48] * 15}) == "GOOD"
     assert compute_health({**good, "cell_voltages": [3.4] + [3.49] * 15}) == "WARNING"
     assert compute_health({**good, "pack_voltage": 43.99}) == "CRITICAL"
     assert compute_health({**good, "pack_voltage": 58.01}) == "CRITICAL"

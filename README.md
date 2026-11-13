@@ -198,7 +198,8 @@ REACT_APP_API_BASE=http://localhost:5001 npm start
 
 GitHub Actions runs on pushes, pull requests, and manual dispatch. It compiles the
 Python backend and simulator, runs the Pytest suite against SQLite and PostgreSQL,
-installs frontend dependencies with `npm ci`, and builds the React dashboard.
+installs frontend dependencies with `npm ci`, runs dashboard tests, and builds the
+React dashboard.
 
 Run the unit tests locally with:
 

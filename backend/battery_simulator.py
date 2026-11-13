@@ -116,7 +116,7 @@ class BatteryTelemetrySimulator:
         if pack_voltage < 44:
             alarms.append("PACK_UNDER_VOLTAGE")
 
-        cell_imbalance = max(cell_voltages) - min(cell_voltages)
+        cell_imbalance = round(max(cell_voltages) - min(cell_voltages), 3)
         if cell_imbalance > 0.1:
             alarms.append("CELL_IMBALANCE")
 

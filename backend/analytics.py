@@ -11,7 +11,7 @@ def summarize_telemetry(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
     frame = pd.DataFrame.from_records(records)
     frame["cell_imbalance"] = frame["cell_voltages"].map(
-        lambda values: max(values) - min(values)
+        lambda values: round(max(values) - min(values), 3)
     )
     frame["alarm_count"] = frame["alarms"].map(len)
     frame["health"] = [compute_health(record) for record in records]
