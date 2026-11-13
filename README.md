@@ -178,6 +178,12 @@ set REACT_APP_API_BASE=http://localhost:5000
 npm start
 ```
 
+## Continuous Integration
+
+GitHub Actions runs on pushes, pull requests, and manual dispatch. It compiles the
+Python backend and simulator, runs the backend smoke test, installs frontend
+dependencies with `npm ci`, and builds the React dashboard.
+
 ## Notes
 
 - SQLite database file defaults to `voltwatch.db` in project root.
