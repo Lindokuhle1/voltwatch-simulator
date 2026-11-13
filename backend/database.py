@@ -37,6 +37,10 @@ class Database:
             self._ensure_columns()
             self._connection.commit()
 
+    def close(self) -> None:
+        with self._lock:
+            self._connection.close()
+
     def _ensure_columns(self) -> None:
         existing = {
             row["name"]

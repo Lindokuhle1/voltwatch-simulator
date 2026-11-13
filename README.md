@@ -129,53 +129,56 @@ Refresh note:
 
 ## Run Instructions
 
-### 1) Backend setup
+### macOS
 
-From project root:
+Install Python 3 and Node.js (including npm) if they are not already installed.
+Run these commands from the project root.
 
 ```bash
-python -m venv .venv
-.venv\Scripts\activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 python -m backend.app
 ```
 
-Backend will start on `http://localhost:5000`.
+The backend starts at `http://localhost:5000`. Keep this terminal open.
 
-### 2) Start simulator
-
-Open a second terminal in project root:
+In a second Terminal window, from the project root, activate the environment and
+start the simulator:
 
 ```bash
-.venv\Scripts\activate
+source .venv/bin/activate
 python scripts/run_simulator.py --interval 5
 ```
 
 By default, this runs 10 battery devices (`battery_pack_01` to `battery_pack_10`).
-
-You can increase fleet size:
+To simulate more batteries:
 
 ```bash
 python scripts/run_simulator.py --interval 5 --battery-count 20
 ```
 
-### 3) Start frontend dashboard
-
-Open a third terminal:
+In a third Terminal window, install frontend dependencies and start the dashboard:
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm start
 ```
 
 Dashboard runs on `http://localhost:3000` and reads API from `http://localhost:5000`.
+Keep the backend and frontend terminals open while using the app.
 
-To override API URL:
+If port 5000 is already in use on your Mac, start the backend on port 5001:
 
 ```bash
-set REACT_APP_API_BASE=http://localhost:5000
-npm start
+API_PORT=5001 python -m backend.app
+```
+
+In the frontend terminal, set its API URL to match:
+
+```bash
+REACT_APP_API_BASE=http://localhost:5001 npm start
 ```
 
 ## Continuous Integration
