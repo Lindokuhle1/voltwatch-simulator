@@ -129,7 +129,7 @@ function Dashboard() {
   };
 
   return (
-    <main className="layout">
+    <main className={selectedDeviceId ? "layout battery-layout" : "layout"}>
       <header className="topbar">
         <h1>VoltWatch Simulator</h1>
         {selectedDeviceId ? <div className={healthClass}>{status.health}</div> : null}
@@ -221,6 +221,25 @@ function Dashboard() {
             >
               {isExporting ? "Exporting..." : "Export Monthly Report"}
             </button>
+          </section>
+
+          <section className="primary-chart-section" aria-label="Battery voltage and current history">
+            <TelemetryChart
+              className="primary-chart-card"
+              title="Voltage and Current"
+              labels={chartSeries.labels}
+              values={chartSeries.voltage}
+              color="#0f4c5c"
+              yLabel="Volts"
+              additionalSeries={[
+                {
+                  label: "Current",
+                  values: chartSeries.current,
+                  color: "#e36414",
+                },
+              ]}
+              secondaryYLabel="Amps"
+            />
           </section>
 
           <section className="detail-wrap">
@@ -399,20 +418,6 @@ function Dashboard() {
           </section>
 
           <section className="charts">
-            <TelemetryChart
-              title="Voltage"
-              labels={chartSeries.labels}
-              values={chartSeries.voltage}
-              color="#0f4c5c"
-              yLabel="Volts"
-            />
-            <TelemetryChart
-              title="Current"
-              labels={chartSeries.labels}
-              values={chartSeries.current}
-              color="#e36414"
-              yLabel="Amps"
-            />
             <TelemetryChart
               title="Temperature"
               labels={chartSeries.labels}

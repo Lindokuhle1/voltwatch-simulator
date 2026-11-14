@@ -28,6 +28,11 @@ body {
   margin: 0 auto;
 }
 
+.battery-layout {
+  width: 100%;
+  max-width: none;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -155,6 +160,36 @@ body {
   padding: 0.8rem;
   height: 450px;
   box-shadow: 0 8px 18px rgba(20, 33, 61, 0.09);
+}
+
+.primary-chart-section {
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.primary-chart-card {
+  height: min(72vh, 820px);
+  min-height: 480px;
+}
+
+.chart-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  min-height: 2rem;
+}
+
+.chart-toolbar p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.chart-canvas {
+  position: relative;
+  height: calc(100% - 2rem);
 }
 
 .table-wrap {
@@ -330,6 +365,6 @@ td {
 
 @media (min-width: 900px) {
   .charts {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   }
 }

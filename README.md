@@ -49,6 +49,7 @@ voltwatch-simulator/
 - Calculates fleet and per-battery analytics with Pandas
 - Provides API endpoints for latest, history, and battery status
 - Displays real-time charts and latest records on React dashboard
+- Shows a full-width battery voltage/current chart first in battery details, with zoom and pan controls
 - Implements health state rules: `GOOD`, `WARNING`, `CRITICAL`
 
 ## Telemetry Payload

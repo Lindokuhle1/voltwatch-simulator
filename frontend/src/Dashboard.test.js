@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import Dashboard from "./Dashboard";
 import {
   getBatteries,
@@ -18,8 +18,8 @@ jest.mock("./api", () => ({
   getTelemetryHistory: jest.fn(),
 }));
 
-jest.mock("./TelemetryChart", () => function MockTelemetryChart() {
-  return null;
+jest.mock("./TelemetryChart", () => function MockTelemetryChart(props) {
+  return <div data-testid="telemetry-chart">{props.title}</div>;
 });
 
 const battery = {
@@ -82,5 +82,13 @@ test("loads battery list and shows analytics for a selected battery", async () =
   expect(screen.getByText("84.5%")).toBeInTheDocument();
   expect(screen.getByText("33.20 C")).toBeInTheDocument();
   expect(screen.getByText("Analytics Samples")).toBeInTheDocument();
+  const charts = screen.getAllByTestId("telemetry-chart");
+  expect(charts).toHaveLength(2);
+  expect(within(charts[0]).getByText("Voltage and Current")).toBeInTheDocument();
+  const batteryLayout = screen.getByRole("main");
+  expect(batteryLayout).toHaveClass("battery-layout");
+  expect(batteryLayout.querySelectorAll(":scope > section")[1]).toHaveClass(
+    "primary-chart-section"
+  );
   expect(getBatteryAnalytics).toHaveBeenCalledWith("battery_pack_01");
 });
